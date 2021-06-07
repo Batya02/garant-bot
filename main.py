@@ -21,7 +21,8 @@ async def main():
     with open(r"config.json", "r", encoding="utf-8") as load_config:
         globals.config = loads(load_config.read()) 
 
-    globals.db = Database("sqlite:///db/GarantBots.sqlite")
+    #Database
+    globals.db = Database("sqlite:///db/GarantBot.sqlite")
     globals.metadata = MetaData()
 
     globals.db_engine = create_engine(str(globals.db.url))
@@ -33,7 +34,14 @@ async def main():
     except Exception as e: logger.error(e)
     globals.dp = Dispatcher(globals.bot, storage=MemoryStorage())
 
-    from commands import start
+    """
+    from commands import (
+            start, my_profile,
+            search_user, active_deals, 
+            queries
+            )
+    """
+    import commands
 
     try:
         await globals.dp.start_polling()
@@ -41,4 +49,6 @@ async def main():
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:exit(0)

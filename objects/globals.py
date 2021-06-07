@@ -9,3 +9,5 @@ dp:Dispatcher = None
 db:Database = None
 metadata:MetaData = None
 db_engine = None
+
+state_type:str = ""
