@@ -36,27 +36,29 @@ async def select_payment_service(query: CallbackQuery):
 
 @dp.callback_query_handler(lambda query: query.data.startswith(("service")))
 async def get_money(query: CallbackQuery):
+    """
     variants = InlineKeyboardMarkup(
         inline_keyboard = [
             [InlineKeyboardButton(text="50", callback_data="value-money_50"), 
              InlineKeyboardButton(text="100", callback_data="value-money_100")], 
             [InlineKeyboardButton(text="150", callback_data="value-money_150"), 
-             InlineKeyboardButton(text="200", callback_data="value-money_200")]
+             InlineKeyboardButton(text="200", callback_data="value-money_200")], 
+            [InlineKeyboardButton(text="Другое значение", callback_data="other_value")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_menu")]
         ]
     )
+    """
 
     await bot.edit_message_text(
         chat_id=query.message.chat.id, 
         message_id = query.message.message_id, 
-        text="Введите сумму для пополнения или выберите варианты", 
-        reply_markup=variants
+        text="Введите сумму для пополнения:"
         )
 
     await Mem.get_amount_balance_func.set()
 
 @dp.callback_query_handler(lambda query: query.data.startswith(("value-money")))
-async def value_money(query: CallbackQuery):
-    pass
+async def value_money(query: CallbackQuery):pass
 
 @dp.callback_query_handler(lambda query: query.data.startswith(("create-deal")))
 async def start_deal(query: CallbackQuery, state: FSMContext):
@@ -136,7 +138,11 @@ async def active_sales(query: CallbackQuery):
 
 @dp.message_handler(state=Mem.get_amount_balance_func)
 async def get_amount_balance(message: Message, state: FSMContext):
-    pass
+    await state.finish()
+    if not message.text.isdigit():
+        return await message.answer(text="Вводимое значение должно быть числом!")
+
+    sum = float(message.text)
 
 @dp.message_handler(state=Mem.set_deal_amount)
 async def set_deal_amount(message: Message, state: FSMContext):
@@ -239,3 +245,19 @@ async def page_deal(query: CallbackQuery):
         f"Тип: <i>{type}</i>",
         reply_markup=paginator.markup
     )
+
+@dp.callback_query_handler(lambda query: query.data == "back_menu")
+async def back(query: CallbackQuery):
+
+    payments_services_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=button, callback_data=f"service_{button}") for button in payment_services]
+        ]
+    )
+
+    return await bot.edit_message_text(
+        chat_id=query.message.chat.id, 
+        message_id = query.message.message_id, 
+        text="Выберите платежную систему", 
+        reply_markup=payments_services_markup
+        )

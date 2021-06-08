@@ -1,4 +1,4 @@
-from orm import Model, Integer, String, Boolean, Float, DateTime
+from orm import Model, Integer, String, Boolean, DateTime, Float
 from objects.globals import db, metadata
 from datetime import datetime as dt
 

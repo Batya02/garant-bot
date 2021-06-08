@@ -3,7 +3,7 @@ from objects import globals
 
 from aiogram.types import (
         Message, InlineKeyboardMarkup, 
-        InlineKeyboardButton
+        InlineKeyboardButton, fields
         )
 
 from db_models.User import User
@@ -26,12 +26,20 @@ async def my_profile(message: Message):
     sales = await SAS.objects.filter(main_user=user_data.user_id).all()
     shops = await SAS.objects.filter(not_main_user=user_data.user_id).all()
 
+    sales_sum = await SAS.objects.filter(main_user=user_data.user_id).all()
+    sales_sum = sum([float(sum.price) for sum in sales_sum])
+
+    shops_sum = await SAS.objects.filter(not_main_user=user_data.user_id).all()
+    shops_sum = sum([float(sum.price) for sum in shops_sum])
+
     await message.answer(
             f"🗝Ваш ID: <code>{user_data.user_id}</code>\n"
             f"💰Ваш баланс: {user_data.balance}\n\n"
-            f"▪️▪️▪️▪️▪️▪️▪️▪\n"
+            f"➜\n"
             f"🛒Продажи: {len(sales)} шт\n"
             f"🛒Покупки: {len(shops)} шт\n"
-            f"▪️▪️▪️▪️▪️▪️▪️▪️", 
+            f"➜\n"
+            f"📊Сумма продаж: {sales_sum}\n"
+            f"📊Сумма покупок: {shops_sum}", 
             reply_markup=get_and_send_money
             )

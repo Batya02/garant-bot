@@ -34,13 +34,6 @@ async def main():
     except Exception as e: logger.error(e)
     globals.dp = Dispatcher(globals.bot, storage=MemoryStorage())
 
-    """
-    from commands import (
-            start, my_profile,
-            search_user, active_deals, 
-            queries
-            )
-    """
     import commands
 
     try:
