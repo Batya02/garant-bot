@@ -6,10 +6,13 @@ from aiogram.types import (
 from aiogram.dispatcher.storage import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 
-from objects.globals import dp, bot
+from objects.globals import dp, bot, payment_services
 from db_models.Shops_and_Sales import SAS
 
 from datetime import datetime as dt
+
+from telegram_bot_pagination import InlineKeyboardPaginator
+from formats.dateTime import datetime_format
 
 class Mem(StatesGroup):
     get_amount_balance_func = State()
@@ -17,7 +20,21 @@ class Mem(StatesGroup):
     main_user = State()
     not_main_user = State()
 
-@dp.callback_query_handler(lambda query: query.data.startswith(("get-money")))
+@dp.callback_query_handler(lambda query: query.data == "select-payment-service")
+async def select_payment_service(query: CallbackQuery):
+    payments_services_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=button, callback_data=f"service_{button}") for button in payment_services]
+        ]
+    )
+
+    return await bot.edit_message_text(
+        chat_id=query.message.chat.id, 
+        message_id = query.message.message_id, 
+        text="Выберите платежную систему", 
+        reply_markup=payments_services_markup)
+
+@dp.callback_query_handler(lambda query: query.data.startswith(("service")))
 async def get_money(query: CallbackQuery):
     variants = InlineKeyboardMarkup(
         inline_keyboard = [
@@ -28,11 +45,12 @@ async def get_money(query: CallbackQuery):
         ]
     )
 
-    await bot.send_message(
-        query.from_user.id, 
+    await bot.edit_message_text(
+        chat_id=query.message.chat.id, 
+        message_id = query.message.message_id, 
         text="Введите сумму для пополнения или выберите варианты", 
         reply_markup=variants
-    )
+        )
 
     await Mem.get_amount_balance_func.set()
 
@@ -83,7 +101,7 @@ async def active_shops(query: CallbackQuery):
             reply_markup=globals()[f"{shop.id}"]
         )
 
-    await bot.send_message(
+    return await bot.send_message(
         query.from_user.id, 
         text=f"У вас активных покупок: {len(shops)}"
     )
@@ -91,6 +109,12 @@ async def active_shops(query: CallbackQuery):
 @dp.callback_query_handler(lambda query: query.data.startswith(("active_sales")))
 async def active_sales(query: CallbackQuery):
     sales = await SAS.objects.filter(not_main_user=query.from_user.id, ended=0).all()
+
+    if sales == []:
+        return await bot.send_message(
+            query.from_user.id, 
+            text="У вас нет активных продаж!"
+        )
 
     for sale in sales:
         date = dt.strftime(sale.created, "%Y-%m-%d %H:%M:%S")
@@ -105,13 +129,7 @@ async def active_sales(query: CallbackQuery):
             f"Тип: {type}"
         )
 
-    if sales == []:
-        return await bot.send_message(
-            query.from_user.id, 
-            text="У вас нет активных продаж!"
-        )
-
-    await bot.send_message(
+    return await bot.send_message(
         query.from_user.id, 
         text=f"У вас активных продаж: {len(sales)}"
     )
@@ -149,10 +167,75 @@ async def set_deal_amount(message: Message, state: FSMContext):
 @dp.callback_query_handler(lambda query: query.data.startswith(("off-deal")))
 async def off_deal(query: CallbackQuery): 
     update_data = await SAS.objects.get(id=int(query.data.split("_")[1]))
-    await update_data.update(ended=True)
+    await update_data.update(uncreated=dt.now(), ended=True)
     
     await bot.edit_message_text(
             chat_id = query.message.chat.id, 
             message_id = query.message.message_id, 
             text = "Сделка завершена!"
             )
+
+@dp.callback_query_handler(lambda query: query.data == "off#deals")
+async def off_deals(query: CallbackQuery):
+    all_deals = await SAS.objects.filter(main_user=query.from_user.id, ended=True).all()
+    
+    if all_deals == []:
+        return await bot.send_message(
+            query.from_user.id, 
+            text="Завершенные сделки отсутствуют!"
+        )
+
+    first_deal = all_deals[0]
+    created = datetime_format(first_deal.created)
+    uncreated = datetime_format(first_deal.uncreated)
+    type = "Сделка" if first_deal.type == "deal" else "Unknow"
+    
+    global COUNT_DEALS
+    COUNT_DEALS = len(all_deals)
+
+    paginator = InlineKeyboardPaginator(
+        COUNT_DEALS, 
+        current_page=1, 
+        data_pattern="page_deal#{page}"
+    )
+
+    return await bot.send_message(
+        query.from_user.id, 
+        text=f"Завершенная сделка\n\n"
+        f"ID: {first_deal.id}\n"
+        f"Покупатель: <code>{first_deal.main_user}</code>\n"
+        f"Дата и время создания: {created}\n"
+        f"Дата и время завершения: {uncreated}\n"
+        f"Сумма: <code>{first_deal.price}</code>\n"
+        f"Продавец: <code>{first_deal.not_main_user}</code>\n"
+        f"Тип: <i>{type}</i>", 
+        reply_markup=paginator.markup
+    )
+
+@dp.callback_query_handler(lambda query: query.data.startswith(("page_deal")))
+async def page_deal(query: CallbackQuery):
+    
+    deal_data = await SAS.objects.get(id=int(query.data.split("#")[1]))
+    created = datetime_format(deal_data.created)
+    uncreated = datetime_format(deal_data.uncreated)
+    type = "Сделка" if deal_data.type == "deal" else "Unknow"
+
+    paginator = InlineKeyboardPaginator(
+        COUNT_DEALS, 
+        current_page=int(query.data.split("#")[1]), 
+        data_pattern="page_deal#{page}"
+    )
+
+    return await bot.edit_message_text(
+        chat_id=query.message.chat.id, 
+        message_id = query.message.message_id, 
+        text=f"Завершенная сделка\n\n"
+        f"ID: {deal_data.id}\n"
+        f"Покупатель: <code>{deal_data.main_user}</code>\n"
+        f"Дата и время создания: {created}\n"
+        f"Дата и время завершения: {uncreated}\n"
+        f"Сумма: <code>{deal_data.price}</code>\n"
+        f"Продавец: <code>{deal_data.not_main_user}</code>\n"
+        f"Тип: <i>{type}</i>",
+        reply_markup=paginator.markup
+    )
