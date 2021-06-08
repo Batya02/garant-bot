@@ -15,7 +15,10 @@ from loguru import logger
 async def main():
     if not path.exists("config.json"):
         with open(r"config.json", "w") as write_config:
-            write_config.write(dumps({"token":None}))
+            write_config.write(dumps({
+                "token":None, 
+                "qiwi_phone":None, 
+                "qiwi_token":None}))
             write_config.close()
 
     with open(r"config.json", "r", encoding="utf-8") as load_config:
