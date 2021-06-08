@@ -15,15 +15,16 @@ async def my_profile(message: Message):
     
     get_and_send_money = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="Пополнить", callback_data=f"get-money")]
+                [InlineKeyboardButton(text="Пополнить", callback_data=f"select-payment-service")], 
+                [InlineKeyboardButton(text="Завершенные сделки", callback_data="off#deals")]
             ]
     )
 
     user_data = await User.objects.filter(user_id=message.from_user.id).all()
     user_data = user_data[0]
 
-    sales = await SAS.objects.filter(seller_id=user_data.user_id).all()
-    shops = await SAS.objects.filter(buyer_id=user_data.user_id).all()
+    sales = await SAS.objects.filter(main_user=user_data.user_id).all()
+    shops = await SAS.objects.filter(not_main_user=user_data.user_id).all()
 
     await message.answer(
             f"🗝Ваш ID: <code>{user_data.user_id}</code>\n"
