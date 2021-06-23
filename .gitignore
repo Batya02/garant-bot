@@ -5,4 +5,8 @@ Scripts/
 pyvenv.cfg
 config.json
 db/
+bin/
+include/
+lib/
+lib64/python3.9
 

@@ -1,4 +1,5 @@
 from typing import Dict
+from asyncio import sleep
 from aiogram.types import (
         CallbackQuery, InlineKeyboardMarkup, 
         Message,       InlineKeyboardButton
@@ -6,13 +7,19 @@ from aiogram.types import (
 from aiogram.dispatcher.storage import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 
-from objects.globals import dp, bot, payment_services
+from objects.globals import dp, bot, payment_services, config
+from db_models.User import User
 from db_models.Shops_and_Sales import SAS
 
 from datetime import datetime as dt
 
 from telegram_bot_pagination import InlineKeyboardPaginator
 from formats.dateTime import datetime_format
+
+#Payment service
+from qiwipyapi import Wallet
+
+p2p_wallet = Wallet(config["qiwi_phone"], p2p_sec_key=config["qiwi_token"])
 
 class Mem(StatesGroup):
     get_amount_balance_func = State()
@@ -48,6 +55,8 @@ async def get_money(query: CallbackQuery):
         ]
     )
     """
+    global SERVICE
+    SERVICE = query.data.split("_")[1]
 
     await bot.edit_message_text(
         chat_id=query.message.chat.id, 
@@ -142,7 +151,32 @@ async def get_amount_balance(message: Message, state: FSMContext):
     if not message.text.isdigit():
         return await message.answer(text="Вводимое значение должно быть числом!")
 
-    sum = float(message.text)
+    sum:float = float(message.text)
+
+    if SERVICE == "Qiwi":
+        res = p2p_wallet.create_invoice(value=sum)
+        continue_button_payment = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Продолжить", url=res["payUrl"])]
+            ]
+        )
+        await message.answer(
+            "Нажмите на кнопку для продолжения оплаты!", 
+            reply_markup=continue_button_payment
+        )
+        billId = res["billId"]
+        while True:
+            status = p2p_wallet.invoice_status(bill_id=billId)
+            if status["status"]["value"] == "WAITING":pass
+            elif status["status"]["value"] == "PAID":
+                update_balance = await User.objects.get(user_id=message.from_user.id)
+                new_balance_value = float(update_balance.balance) + sum
+                await update_balance.update(balance=new_balance_value)
+                await message.answer(f"Ваш баланс успешно пополнен на {sum}₽")
+                break
+            await sleep(5)
+            
+    elif SERVICE == "Yoomoney":pass
 
 @dp.message_handler(state=Mem.set_deal_amount)
 async def set_deal_amount(message: Message, state: FSMContext):
