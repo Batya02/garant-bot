@@ -41,18 +41,7 @@ async def select_payment_service(query: CallbackQuery):
 
 @dp.callback_query_handler(lambda query: query.data.startswith(("service")))
 async def get_money(query: CallbackQuery):
-    """
-    variants = InlineKeyboardMarkup(
-        inline_keyboard = [
-            [InlineKeyboardButton(text="50", callback_data="value-money_50"), 
-             InlineKeyboardButton(text="100", callback_data="value-money_100")], 
-            [InlineKeyboardButton(text="150", callback_data="value-money_150"), 
-             InlineKeyboardButton(text="200", callback_data="value-money_200")], 
-            [InlineKeyboardButton(text="Другое значение", callback_data="other_value")],
-            [InlineKeyboardButton(text="Назад", callback_data="back_menu")]
-        ]
-    )
-    """
+    
     global SERVICE
     SERVICE = query.data.split("_")[1]
 
@@ -153,6 +142,7 @@ async def get_amount_balance(message: Message, state: FSMContext):
 
     if SERVICE == "Qiwi":
         res = p2p_wallet.create_invoice(value=sum, expirationDateTime=datetime_format(dt.now()+timedelta(hours=6)))
+
         continue_button_payment = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="Продолжить", url=res["payUrl"])]
