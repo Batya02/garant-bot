@@ -12,14 +12,12 @@ from db_models.User import User
 from db_models.Shops_and_Sales import SAS
 
 from datetime import datetime as dt
+from datetime import timedelta
 
 from telegram_bot_pagination import InlineKeyboardPaginator
 from formats.dateTime import datetime_format
 
-#Payment service
-from qiwipyapi import Wallet
-
-p2p_wallet = Wallet(config["qiwi_phone"], p2p_sec_key=config["qiwi_token"])
+from payment_services.QIWI import p2p_wallet
 
 class Mem(StatesGroup):
     get_amount_balance_func = State()
@@ -154,7 +152,7 @@ async def get_amount_balance(message: Message, state: FSMContext):
     sum:float = float(message.text)
 
     if SERVICE == "Qiwi":
-        res = p2p_wallet.create_invoice(value=sum)
+        res = p2p_wallet.create_invoice(value=sum, expirationDateTime=datetime_format(dt.now()+timedelta(hours=6)))
         continue_button_payment = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="Продолжить", url=res["payUrl"])]
