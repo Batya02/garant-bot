@@ -45,6 +45,9 @@ async def get_money(query: CallbackQuery):
     global SERVICE
     SERVICE = query.data.split("_")[1]
 
+    if SERVICE == "Yoomoney":
+        return await query.answer(text="Временно недоступен!")
+
     await bot.edit_message_text(
         chat_id=query.message.chat.id, 
         message_id = query.message.message_id, 
@@ -205,24 +208,41 @@ async def off_deal(query: CallbackQuery):
 
 @dp.callback_query_handler(lambda query: query.data == "off#deals")
 async def off_deals(query: CallbackQuery):
-    all_deals = await SAS.objects.filter(main_user=query.from_user.id, ended=True).all()
-    
-    if all_deals == []:
-        return await bot.send_message(
-            query.from_user.id, 
-            text="Завершенные сделки отсутствуют!"
+    type_deal_buttons = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Покупки", callback_data="off_shops")], 
+            [InlineKeyboardButton(text="Продажи", callback_data="off_sales")]
+        ]
+    )
+
+    return await bot.edit_message_text(
+        chat_id=query.from_user.id, 
+        message_id=query.message.message_id, 
+        text="Выберите тип", 
+        reply_markup=type_deal_buttons
+    )
+
+@dp.callback_query_handler(lambda query: query.data == "off_shops")
+async def all_off_shops(query: CallbackQuery):
+    all_shops = await SAS.objects.filter(main_user=query.from_user.id, ended=True).all()
+
+    if all_shops == []:
+        return await bot.edit_message_text(
+            chat_id=query.from_user.id, 
+            message_id=query.message.message_id, 
+            text="У вас отсутствуют завершенные покупки!"
         )
 
-    first_deal = all_deals[0]
-    created = datetime_format(first_deal.created)
-    uncreated = datetime_format(first_deal.uncreated)
-    type = "Сделка" if first_deal.type == "deal" else "Unknow"
+    first_shop = all_shops[0]
+    created = datetime_format(first_shop.created)
+    uncreated = datetime_format(first_shop.uncreated)
+    type = "Сделка" if first_shop.type == "deal" else "Unknow"
     
-    global COUNT_DEALS
-    COUNT_DEALS = len(all_deals)
+    global ALL_DEALS
+    ALL_DEALS = [id.id for id in all_shops]
 
     paginator = InlineKeyboardPaginator(
-        COUNT_DEALS, 
+        len(ALL_DEALS), 
         current_page=1, 
         data_pattern="page_deal#{page}"
     )
@@ -230,12 +250,43 @@ async def off_deals(query: CallbackQuery):
     return await bot.send_message(
         query.from_user.id, 
         text=f"Завершенная сделка\n\n"
-        f"ID: {first_deal.id}\n"
-        f"Покупатель: <code>{first_deal.main_user}</code>\n"
+        f"ID: {first_shop.id}\n"
+        f"Покупатель: <code>{first_shop.main_user}</code>\n"
         f"Дата и время создания: {created}\n"
         f"Дата и время завершения: {uncreated}\n"
-        f"Сумма: <code>{first_deal.price}</code>\n"
-        f"Продавец: <code>{first_deal.not_main_user}</code>\n"
+        f"Сумма: <code>{first_shop.price}</code>\n"
+        f"Продавец: <code>{first_shop.not_main_user}</code>\n"
+        f"Тип: <i>{type}</i>", 
+        reply_markup=paginator.markup
+    )
+
+@dp.callback_query_handler(lambda query: query.data == "off_sales")
+async def all_off_sales(query: CallbackQuery):
+    all_sales = await SAS.objects.filter(not_main_user=query.from_user.id, ended=True).all()
+
+    first_sale = all_sales[0]
+    created = datetime_format(first_sale.created)
+    uncreated = datetime_format(first_sale.uncreated)
+    type = "Сделка" if first_sale.type == "deal" else "Unknow"
+    
+    global ALL_DEALS
+    ALL_DEALS = [id.id for id in all_sales]
+
+    paginator = InlineKeyboardPaginator(
+        len(ALL_DEALS), 
+        current_page=1, 
+        data_pattern="page_deal#{page}"
+    )
+
+    return await bot.send_message(
+        query.from_user.id, 
+        text=f"Завершенная сделка\n\n"
+        f"ID: {first_sale.id}\n"
+        f"Покупатель: <code>{first_sale.main_user}</code>\n"
+        f"Дата и время создания: {created}\n"
+        f"Дата и время завершения: {uncreated}\n"
+        f"Сумма: <code>{first_sale.price}</code>\n"
+        f"Продавец: <code>{first_sale.not_main_user}</code>\n"
         f"Тип: <i>{type}</i>", 
         reply_markup=paginator.markup
     )
@@ -243,13 +294,13 @@ async def off_deals(query: CallbackQuery):
 @dp.callback_query_handler(lambda query: query.data.startswith(("page_deal")))
 async def page_deal(query: CallbackQuery):
     
-    deal_data = await SAS.objects.get(id=int(query.data.split("#")[1]))
+    deal_data = await SAS.objects.get(id=ALL_DEALS[int(query.data.split("#")[1])-1])
     created = datetime_format(deal_data.created)
     uncreated = datetime_format(deal_data.uncreated)
     type = "Сделка" if deal_data.type == "deal" else "Unknow"
 
     paginator = InlineKeyboardPaginator(
-        COUNT_DEALS, 
+        len(ALL_DEALS), 
         current_page=int(query.data.split("#")[1]), 
         data_pattern="page_deal#{page}"
     )

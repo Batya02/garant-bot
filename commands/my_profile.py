@@ -23,8 +23,8 @@ async def my_profile(message: Message):
     user_data = await User.objects.filter(user_id=message.from_user.id).all()
     user_data = user_data[0]
 
-    sales = await SAS.objects.filter(main_user=user_data.user_id).all()
-    shops = await SAS.objects.filter(not_main_user=user_data.user_id).all()
+    sales = await SAS.objects.filter(not_main_user=user_data.user_id).all()
+    shops = await SAS.objects.filter(main_user=user_data.user_id).all()
 
     sales_sum = await SAS.objects.filter(main_user=user_data.user_id).all()
     sales_sum = sum([float(sum.price) for sum in sales_sum])
