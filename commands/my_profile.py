@@ -3,7 +3,7 @@ from objects import globals
 
 from aiogram.types import (
         Message, InlineKeyboardMarkup, 
-        InlineKeyboardButton, fields
+        InlineKeyboardButton
         )
 
 from db_models.User import User
