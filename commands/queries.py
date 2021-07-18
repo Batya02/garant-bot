@@ -76,7 +76,7 @@ async def start_deal(query: CallbackQuery, state: FSMContext):
 async def active_shops(query: CallbackQuery):
     shops = await SAS.objects.filter(main_user=query.from_user.id, ended=0).all()
 
-    if shops == []:
+    if len(shops) == 0:
         return await bot.send_message(
             query.from_user.id, 
             text="У вас нет активных покупок!"
@@ -111,7 +111,7 @@ async def active_shops(query: CallbackQuery):
 async def active_sales(query: CallbackQuery):
     sales = await SAS.objects.filter(not_main_user=query.from_user.id, ended=0).all()
 
-    if sales == []:
+    if len(sales) == 0:
         return await bot.send_message(
             query.from_user.id, 
             text="У вас нет активных продаж!"
@@ -205,32 +205,43 @@ async def set_deal_amount(message: Message, state: FSMContext):
 @dp.callback_query_handler(lambda query: query.data.startswith(("off-deal")))
 async def off_deal(query: CallbackQuery): 
     update_data_deal = await SAS.objects.get(id=int(query.data.split("_")[1]))
-    update_data_user = await User.objects.get(user_id=query.from_user.id)
 
-    new_balance:float = float(update_data_user.balance) - float(update_data_deal.price)
-
-    if int(new_balance) < 0:
-        return await bot.send_message(
-            chat_id=query.from_user.id, 
-            text="Недостаточно средств для завершения сделки, нужно пополнить счёт!"
-        )
-
-    await update_data_user.update(balance=new_balance)
-    await update_data_deal.update(uncreated=dt.now(), ended=True)
+    update_data_not_main_user = await User.objects.get(user_id=int(update_data_deal.not_main_user))
     
+    reset_deal_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Завершить", callback_data=f"reset-deal_{update_data_deal.id}"
+                )
+            ]
+        ]
+    ) 
+
+    await bot.send_message(
+        chat_id=update_data_not_main_user.user_id, 
+        text=f"ID сделки: <code>{update_data_deal.id}</code>\n"
+        f"Получена заявка на завершение сделки.\n"
+        f"Завершить сделку?", 
+        reply_markup=reset_deal_markup
+    )
+
     await bot.edit_message_text(
-            chat_id = query.message.chat.id, 
+            chat_id = query.from_user.id, 
             message_id = query.message.message_id, 
-            text = "Сделка завершена!"
+            text = "Отправлена заявка на завершение сделки."
             )
     
 
 @dp.callback_query_handler(lambda query: query.data == "off#deals")
 async def off_deals(query: CallbackQuery):
+
+    all_shops = await SAS.objects.filter(main_user=query.from_user.id, ended=True).all()
+    all_sales = await SAS.objects.filter(not_main_user=query.from_user.id, ended=True).all()
+
     type_deal_buttons = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Покупки", callback_data="off_shops")], 
-            [InlineKeyboardButton(text="Продажи", callback_data="off_sales")]
+            [InlineKeyboardButton(text=f"Покупки({len(all_shops)})", callback_data="off_shops")], 
+            [InlineKeyboardButton(text=f"Продажи({len(all_sales)})", callback_data="off_sales")]
         ]
     )
 
@@ -245,7 +256,7 @@ async def off_deals(query: CallbackQuery):
 async def all_off_shops(query: CallbackQuery):
     all_shops = await SAS.objects.filter(main_user=query.from_user.id, ended=True).all()
 
-    if all_shops == []:
+    if len(all_shops) == 0:
         return await bot.edit_message_text(
             chat_id=query.from_user.id, 
             message_id=query.message.message_id, 
@@ -268,14 +279,14 @@ async def all_off_shops(query: CallbackQuery):
 
     return await bot.send_message(
         query.from_user.id, 
-        text=f"Завершенная сделка\n\n"
-        f"ID: {first_shop.id}\n"
-        f"Покупатель: <code>{first_shop.main_user}</code>\n"
-        f"⏱Создано: {created}\n"
-        f"📅Завершено: {uncreated}\n"
-        f"Сумма: <code>{first_shop.price}</code>\n"
-        f"Продавец: <code>{first_shop.not_main_user}</code>\n"
-        f"Тип: <i>{type}</i>", 
+        text=f"✅Завершенная сделка\n\n"
+        f"📍ID: {first_shop.id}\n"
+        f"→Покупатель: <code>{first_shop.main_user}</code>\n"
+        f"⏱Создано: <b>{created}</b>\n"
+        f"📅Завершено: <b>{uncreated}</b>\n"
+        f"💰Сумма: <code>{first_shop.price}</code>\n"
+        f"←Продавец: <code>{first_shop.not_main_user}</code>\n"
+        f"🗞Тип: <i>{type}</i>", 
         reply_markup=paginator.markup
     )
 
@@ -284,7 +295,7 @@ async def all_off_sales(query: CallbackQuery):
 
     all_sales = await SAS.objects.filter(not_main_user=query.from_user.id, ended=True).all()
 
-    if all_sales == []:
+    if len(all_sales) == 0:
         return await bot.edit_message_text(
             chat_id=query.from_user.id, 
             message_id=query.message.message_id, 
@@ -308,14 +319,14 @@ async def all_off_sales(query: CallbackQuery):
 
     return await bot.send_message(
         query.from_user.id, 
-        text=f"Завершенная сделка\n\n"
-        f"ID: {first_sale.id}\n"
-        f"Покупатель: <code>{first_sale.main_user}</code>\n"
-        f"⏱Создано: {created}\n"
-        f"📅Завершено: {uncreated}\n"
-        f"Сумма: <code>{first_sale.price}</code>\n"
-        f"Продавец: <code>{first_sale.not_main_user}</code>\n"
-        f"Тип: <i>{type}</i>", 
+        text=f"✅Завершенная сделка\n\n"
+        f"📍ID: {first_sale.id}\n"
+        f"→Покупатель: <code>{first_sale.main_user}</code>\n"
+        f"⏱Создано: <b>{created}</b>\n"
+        f"📅Завершено: <b>{uncreated}</b>\n"
+        f"💰Сумма: <code>{first_sale.price}</code>\n"
+        f"←Продавец: <code>{first_sale.not_main_user}</code>\n"
+        f"🗞Тип: <i>{type}</i>", 
         reply_markup=paginator.markup
     )
 
@@ -336,14 +347,14 @@ async def page_deal(query: CallbackQuery):
     return await bot.edit_message_text(
         chat_id=query.message.chat.id, 
         message_id = query.message.message_id, 
-        text=f"Завершенная сделка\n\n"
-        f"ID: {deal_data.id}\n"
-        f"Покупатель: <code>{deal_data.main_user}</code>\n"
-        f"⏱Создано: {created}\n"
-        f"📅Завершено: {uncreated}\n"
-        f"Сумма: <code>{deal_data.price}</code>\n"
-        f"Продавец: <code>{deal_data.not_main_user}</code>\n"
-        f"Тип: <i>{type}</i>",
+        text=f"✅Завершенная сделка\n\n"
+        f"📍ID: {deal_data.id}\n"
+        f"→Покупатель: <code>{deal_data.main_user}</code>\n"
+        f"⏱Создано: <b>{created}</b>\n"
+        f"📅Завершено: <b>{uncreated}</b>\n"
+        f"💰Сумма: <code>{deal_data.price}</code>\n"
+        f"←Продавец: <code>{deal_data.not_main_user}</code>\n"
+        f"🗞Тип: <i>{type}</i>",
         reply_markup=paginator.markup
     )
 
@@ -362,3 +373,36 @@ async def back(query: CallbackQuery):
         text="Выберите платежную систему", 
         reply_markup=payments_services_markup
         )
+
+@dp.callback_query_handler(lambda query: query.data.startswith(("reset-deal")))
+async def reset_deal(query: CallbackQuery, state:FSMContext):
+    deal_info = await SAS.objects.get(id=int(query.data.split("_")[1]))
+    
+    update_data_main_user = await User.objects.get(user_id=query.from_user.id)
+
+    new_balance_main_user:float = float(update_data_main_user.balance) - float(deal_info.price)
+
+    if int(new_balance_main_user) < 0:
+        return await bot.send_message(
+            chat_id=query.from_user.id, 
+            text="Недостаточно средств для завершения сделки, нужно пополнить счёт!"
+        )
+
+    await update_data_main_user.update(balance=new_balance_main_user)
+    await deal_info.update(uncreated=dt.now(), ended=True)
+
+    update_data_not_main_user = await User.objects.get(user_id=int(deal_info.not_main_user))
+    
+    new_balance_not_main_user:float = float(update_data_not_main_user.balance) + float(deal_info.price)
+    await update_data_not_main_user.update(balance=new_balance_not_main_user)
+
+    user_ids = []
+    user_ids.extend((query.from_user.id, deal_info.main_user))
+
+    for i in user_ids:
+        await bot.send_message(
+            chat_id=i, 
+            text="✅Сделка успешно завершена!"
+        )
+
+    await state.finish()
