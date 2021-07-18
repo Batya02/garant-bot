@@ -34,8 +34,11 @@ async def start(message: Message):
             [
                 KeyboardButton(text="👤Мой профиль"), 
                 KeyboardButton(text="🔍Найти пользователя"), 
-                KeyboardButton(text="📁Активные сделки")
-                ]
+            ], 
+            [
+                KeyboardButton(text="📁Активные сделки"), 
+                KeyboardButton(text="❓Помощь")
+            ]
         ]
     ) 
     
