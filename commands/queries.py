@@ -281,7 +281,16 @@ async def all_off_shops(query: CallbackQuery):
 
 @dp.callback_query_handler(lambda query: query.data == "off_sales")
 async def all_off_sales(query: CallbackQuery):
+
     all_sales = await SAS.objects.filter(not_main_user=query.from_user.id, ended=True).all()
+
+    if all_sales == []:
+        return await bot.edit_message_text(
+            chat_id=query.from_user.id, 
+            message_id=query.message.message_id, 
+            text="У вас отсутствуют завершенные покупки!"
+        )
+
 
     first_sale = all_sales[0]
     created = datetime_format(first_sale.created)
