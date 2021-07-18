@@ -1,2 +1,6 @@
-python3 main.py
+#!/bin/bash
+python main.py
 
+echo ""
+echo "Press to any key for continue ..."
+read
