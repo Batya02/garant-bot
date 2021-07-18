@@ -171,9 +171,6 @@ async def get_amount_balance(message: Message, state: FSMContext):
 
 @dp.message_handler(state=Mem.set_deal_amount)
 async def set_deal_amount(message: Message, state: FSMContext):
-    data:dict = await state.get_data()
-    main_user = data["main_user"]
-    not_main_user = data["not_main_user"]
     
     try:
         price = float(message.text)
@@ -181,6 +178,16 @@ async def set_deal_amount(message: Message, state: FSMContext):
         return await message.answer(
             text="Пример правильного формата суммы: 10; 10.0"
         )
+
+    user_info = await User.objects.get(user_id=message.from_user.id)
+
+    if float(user_info.balance) < float(message.text):
+        await state.finish()
+        return await message.answer(text="Недостаточно средств на балансе!")
+
+    data:dict = await state.get_data()
+    main_user = data["main_user"]
+    not_main_user = data["not_main_user"]
     
     await SAS.objects.create(
             main_user=main_user, 
@@ -197,14 +204,26 @@ async def set_deal_amount(message: Message, state: FSMContext):
 
 @dp.callback_query_handler(lambda query: query.data.startswith(("off-deal")))
 async def off_deal(query: CallbackQuery): 
-    update_data = await SAS.objects.get(id=int(query.data.split("_")[1]))
-    await update_data.update(uncreated=dt.now(), ended=True)
+    update_data_deal = await SAS.objects.get(id=int(query.data.split("_")[1]))
+    update_data_user = await User.objects.get(user_id=query.from_user.id)
+
+    new_balance:float = float(update_data_user.balance) - float(update_data_deal.price)
+
+    if int(new_balance) < 0:
+        return await bot.send_message(
+            chat_id=query.from_user.id, 
+            text="Недостаточно средств для завершения сделки, нужно пополнить счёт!"
+        )
+
+    await update_data_user.update(balance=new_balance)
+    await update_data_deal.update(uncreated=dt.now(), ended=True)
     
     await bot.edit_message_text(
             chat_id = query.message.chat.id, 
             message_id = query.message.message_id, 
             text = "Сделка завершена!"
             )
+    
 
 @dp.callback_query_handler(lambda query: query.data == "off#deals")
 async def off_deals(query: CallbackQuery):
@@ -252,8 +271,8 @@ async def all_off_shops(query: CallbackQuery):
         text=f"Завершенная сделка\n\n"
         f"ID: {first_shop.id}\n"
         f"Покупатель: <code>{first_shop.main_user}</code>\n"
-        f"Дата и время создания: {created}\n"
-        f"Дата и время завершения: {uncreated}\n"
+        f"⏱Создано: {created}\n"
+        f"📅Завершено: {uncreated}\n"
         f"Сумма: <code>{first_shop.price}</code>\n"
         f"Продавец: <code>{first_shop.not_main_user}</code>\n"
         f"Тип: <i>{type}</i>", 
@@ -283,8 +302,8 @@ async def all_off_sales(query: CallbackQuery):
         text=f"Завершенная сделка\n\n"
         f"ID: {first_sale.id}\n"
         f"Покупатель: <code>{first_sale.main_user}</code>\n"
-        f"Дата и время создания: {created}\n"
-        f"Дата и время завершения: {uncreated}\n"
+        f"⏱Создано: {created}\n"
+        f"📅Завершено: {uncreated}\n"
         f"Сумма: <code>{first_sale.price}</code>\n"
         f"Продавец: <code>{first_sale.not_main_user}</code>\n"
         f"Тип: <i>{type}</i>", 
@@ -311,8 +330,8 @@ async def page_deal(query: CallbackQuery):
         text=f"Завершенная сделка\n\n"
         f"ID: {deal_data.id}\n"
         f"Покупатель: <code>{deal_data.main_user}</code>\n"
-        f"Дата и время создания: {created}\n"
-        f"Дата и время завершения: {uncreated}\n"
+        f"⏱Создано: {created}\n"
+        f"📅Завершено: {uncreated}\n"
         f"Сумма: <code>{deal_data.price}</code>\n"
         f"Продавец: <code>{deal_data.not_main_user}</code>\n"
         f"Тип: <i>{type}</i>",
