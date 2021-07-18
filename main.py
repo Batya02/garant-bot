@@ -17,6 +17,7 @@ async def main():
         with open(r"config.json", "w") as write_config:
             write_config.write(dumps({
                 "token":None, 
+                "admin_username":None,
                 "qiwi_phone":None, 
                 "qiwi_token":None}))
             write_config.close()
@@ -25,7 +26,7 @@ async def main():
         globals.config = loads(load_config.read()) 
 
     #Database
-    globals.db = Database("sqlite:///db/GarantBot.sqlite")
+    globals.db = Database("sqlite:///db/db.sqlite")
     globals.metadata = MetaData()
 
     globals.db_engine = create_engine(str(globals.db.url))
