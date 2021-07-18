@@ -288,7 +288,7 @@ async def all_off_sales(query: CallbackQuery):
         return await bot.edit_message_text(
             chat_id=query.from_user.id, 
             message_id=query.message.message_id, 
-            text="У вас отсутствуют завершенные покупки!"
+            text="У вас отсутствуют завершенные продажи!"
         )
 
 
