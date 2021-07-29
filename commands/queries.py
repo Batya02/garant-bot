@@ -380,17 +380,17 @@ async def back(query: CallbackQuery):
 async def reset_deal(query: CallbackQuery, state:FSMContext):
     deal_info = await SAS.objects.get(id=int(query.data.split("_")[1]))
     
-    update_data_main_user = await User.objects.get(user_id=query.from_user.id)
+    update_data_not_main_user = await User.objects.get(user_id=deal_info.not_main_user)
 
-    new_balance_main_user:float = float(update_data_main_user.balance) - float(deal_info.price)
+    new_balance_not_main_user:float = float(update_data_not_main_user.balance) - float(deal_info.price)
 
-    if int(new_balance_main_user) < 0:
+    if int(new_balance_not_main_user) < 0:
         return await bot.send_message(
             chat_id=query.from_user.id, 
             text="Недостаточно средств для завершения сделки, нужно пополнить счёт!"
         )
 
-    await update_data_main_user.update(balance=new_balance_main_user)
+    await update_data_not_main_user.update(balance=new_balance_not_main_user)
     await deal_info.update(uncreated=dt.now(), ended=True)
 
     update_data_not_main_user = await User.objects.get(user_id=int(deal_info.not_main_user))
