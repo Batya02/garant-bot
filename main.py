@@ -18,8 +18,10 @@ async def main():
             write_config.write(dumps({
                 "token":None, 
                 "admin_username":None,
+                "admin_chat_id":None,
                 "qiwi_phone":None, 
-                "qiwi_token":None}))
+                "qiwi_token":None, 
+                "percent":0}))
             write_config.close()
 
     with open(r"config.json", "r", encoding="utf-8") as load_config:
