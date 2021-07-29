@@ -4,11 +4,13 @@ from db_models.User import User
 from datetime import datetime as dt
 
 from aiogram.types import (
-        Message, ReplyKeyboardMarkup,
+        Message, ReplyKeyboardMarkup, 
         KeyboardButton
         )
 
 from objects import globals
+
+from keyboards.keyboards import MENU_BUTTONS
 
 @dp.message_handler(commands="start")
 async def start(message: Message): 
@@ -28,18 +30,13 @@ async def start(message: Message):
                 created=create_time, 
                 balance=balance) 
 
+    buttons_array = []
+    buttons_array.append([KeyboardButton(MENU_BUTTONS[k]) for k in range(len(MENU_BUTTONS)) if k % 2 == 0])
+    buttons_array.append([KeyboardButton(MENU_BUTTONS[k]) for k in range(len(MENU_BUTTONS)) if k % 2 != 0])
+
     buttons = ReplyKeyboardMarkup(
         resize_keyboard=True, 
-        keyboard=[
-            [
-                KeyboardButton(text="👤Мой профиль"), 
-                KeyboardButton(text="🔍Найти пользователя"), 
-            ], 
-            [
-                KeyboardButton(text="📁Активные сделки"), 
-                KeyboardButton(text="❓Помощь")
-            ]
-        ]
+        keyboard=buttons_array
     ) 
     
     await message.answer(
