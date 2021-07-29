@@ -380,7 +380,7 @@ async def back(query: CallbackQuery):
 async def reset_deal(query: CallbackQuery, state:FSMContext):
     deal_info = await SAS.objects.get(id=int(query.data.split("_")[1]))
     
-    update_data_not_main_user = await User.objects.get(user_id=deal_info.not_main_user)
+    update_data_not_main_user = await User.objects.get(user_id=deal_info.main_user)
 
     new_balance_not_main_user:float = float(update_data_not_main_user.balance) - float(deal_info.price)
 
