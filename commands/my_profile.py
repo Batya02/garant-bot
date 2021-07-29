@@ -16,6 +16,7 @@ async def my_profile(message: Message):
     get_and_send_money = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="Пополнить", callback_data=f"select-payment-service")], 
+                [InlineKeyboardButton(text="Вывести", callback_data="output-money")],
                 [InlineKeyboardButton(text="Завершенные сделки", callback_data="off#deals")]
             ]
     )
