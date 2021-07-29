@@ -21,6 +21,6 @@ async def help(message: Message):
         help_text = load_help_text.read()
 
     return await message.answer(
-        text=help_text, 
+        text=help_text % int(config["percent"]), 
         reply_markup=admin_markup
         )
