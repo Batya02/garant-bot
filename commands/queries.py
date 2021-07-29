@@ -1,29 +1,31 @@
 from typing import Dict
 from asyncio import sleep
+
 from aiogram.types import (
         CallbackQuery, InlineKeyboardMarkup, 
         Message,       InlineKeyboardButton
         )
 from aiogram.dispatcher.storage import FSMContext
-from aiogram.dispatcher.filters.state import StatesGroup, State
 
 from objects.globals import dp, bot, payment_services, config
+
 from db_models.User import User
 from db_models.Shops_and_Sales import SAS
+from db_models.OutputApplications import OutputApplication
 
 from datetime import datetime as dt
 from datetime import timedelta
 
 from telegram_bot_pagination import InlineKeyboardPaginator
+
 from formats.dateTime import datetime_format
+from formats.phone import phone_format
 
 from payment_services.QIWI import p2p_wallet
 
-class Mem(StatesGroup):
-    get_amount_balance_func = State()
-    set_deal_amount = State()
-    main_user = State()
-    not_main_user = State()
+from states.MEM import Mem
+
+from keyboards.keyboards import MENU_BUTTONS
 
 @dp.callback_query_handler(lambda query: query.data == "select-payment-service")
 async def select_payment_service(query: CallbackQuery):
@@ -406,3 +408,96 @@ async def reset_deal(query: CallbackQuery, state:FSMContext):
         )
 
     await state.finish()
+
+@dp.callback_query_handler(lambda query: query.data == "output-money")
+async def output_money(query: CallbackQuery):
+    await bot.edit_message_text(
+        chat_id=query.from_user.id,
+        message_id=query.message.message_id, 
+        text=f"Отменить -> /reset\n"
+        f"❗️Важно: проверьте правильность ввода\n"
+        f"Введите номер телефона или номер карты(Qiwi):"
+    )
+
+    await Mem.get_output_phone_targ.set()
+
+@dp.message_handler(
+    lambda message: message.text not in MENU_BUTTONS,
+    state=Mem.get_output_phone_targ
+    )
+async def output_amount_targ(message: Message, state:FSMContext):
+    if message.text == "/reset":
+        await state.finish()
+        return await message.answer(text="Отмена")
+
+    await state.update_data(get_output_phone_var=phone_format(message.text))
+
+    await message.answer(text=f"Отменить -> /reset\n" f"Введите сумму для вывода:")
+    await Mem.get_output_amount_targ.set()
+
+@dp.message_handler(
+    lambda message: message.text not in MENU_BUTTONS,
+    state=Mem.get_output_amount_targ
+    )
+async def output_amount_targ(message: Message, state:FSMContext):
+    if message.text == "/reset":
+        await state.finish()
+        return await message.answer(text="Отмена")
+
+    if message.text.replace(".", "").isdigit() or message.text.isdigit():
+        await state.update_data(get_output_amount_var=message.text)
+      
+    user_data = await User.objects.get(user_id=message.from_user.id)
+
+    get_state_data = await state.get_data()
+
+    amount:str = get_state_data["get_output_amount_var"]
+
+    percent:float = float(amount) * config["percent"] / 100
+
+    if int(float(user_data.balance) - (float(amount)+percent)) < 0:
+        return await message.answer(
+            text=f"🔴Недостаточно средств на балансе!\n"
+            f"⚠️Попробуйте ввести другое значение или же отмените операцию с помощью команды /reset")
+    
+    phone:str  = get_state_data["get_output_phone_var"]
+    created:str = dt.strftime(dt.now(), "%Y:%m:%d %H:%M:%S")
+
+    confirm_operation_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Подтвердить", callback_data=f"confirm-operation_{message.from_user.id}_{float(amount)+percent}")]
+        ]
+    )
+
+    await bot.send_message(
+        chat_id=config["admin_chat_id"], 
+        text=f"🔔Заявка на вывод➡️\n"
+        f"Номер телефона: {phone}\n"
+        f"Сумма на вывод: {amount}\n"
+        f"Дата создания заявки: {created}", 
+        reply_markup=confirm_operation_markup
+    )
+
+    await message.answer(text="🟢Заявка на вывод успешно создана!")
+
+    await state.finish()
+
+@dp.callback_query_handler(lambda query: query.data.startswith(("confirm-operation")))
+async def confirm_operation(query: CallbackQuery):
+    get_confirm_data = query.data.split("_")
+    get_user_data = await User.objects.get(user_id=get_confirm_data[1])
+    
+    new_balance = float(get_user_data.balance) - float(get_confirm_data[2])
+
+    await get_user_data.update(balance=new_balance)
+
+    await OutputApplication.objects.create(
+        user_id=get_confirm_data[1], 
+        amount=float(get_confirm_data[2])
+    )
+
+    return await bot.edit_message_text(
+        chat_id=query.from_user.id, 
+        message_id=query.message.message_id, 
+        text="Заявка успешно подтверждена!"
+    )
