@@ -1,4 +1,4 @@
-from objects.globals import dp
+from objects.globals import dp, config
 from db_models.User import User
 
 from datetime import datetime as dt
@@ -33,6 +33,9 @@ async def start(message: Message):
     buttons_array = []
     buttons_array.append([KeyboardButton(MENU_BUTTONS[k]) for k in range(len(MENU_BUTTONS)) if k % 2 == 0])
     buttons_array.append([KeyboardButton(MENU_BUTTONS[k]) for k in range(len(MENU_BUTTONS)) if k % 2 != 0])
+
+    if message.from_user.id == int(config["admin_chat_id"]):
+        buttons_array.append([KeyboardButton("📊Статистика")])
 
     buttons = ReplyKeyboardMarkup(
         resize_keyboard=True, 
